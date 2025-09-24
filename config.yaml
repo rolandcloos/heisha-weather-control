@@ -2,7 +2,7 @@ name: Heisha Weather Prediction Control
 version: "1.0.0"
 slug: heisha-weather-control
 description: Intelligente Panasonic Wärmepumpen-Steuerung mit Wettervorhersage und lernendem Algorithmus
-url: https://github.com/roland/heisha-weather-control
+url: https://github.com/rolandcloos/heisha-weather-control
 arch:
   - armhf
   - armv7
