@@ -1,0 +1,41 @@
+ARG BUILD_FROM
+FROM $BUILD_FROM
+
+# Set shell
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
+# Install build dependencies and runtime requirements
+RUN \
+  apk add --no-cache \
+    python3 \
+    py3-pip \
+    py3-setuptools \
+    py3-wheel \
+    tzdata \
+  && apk add --no-cache --virtual .build-deps \
+    gcc \
+    g++ \
+    musl-dev \
+    python3-dev \
+    linux-headers \
+    libffi-dev \
+    openssl-dev \
+  && rm -rf /var/cache/apk/*
+
+# Copy requirements first for better caching
+COPY requirements.txt /tmp/
+RUN pip3 install --no-cache-dir --upgrade pip \
+    && pip3 install --no-cache-dir -r /tmp/requirements.txt \
+    && rm -f /tmp/requirements.txt
+
+# Remove build dependencies to reduce image size
+RUN apk del .build-deps
+
+# Copy data for add-on
+COPY run.sh /
+COPY app/ /opt/app/
+
+# Make run script executable
+RUN chmod a+x /run.sh
+
+CMD [ "/run.sh" ]

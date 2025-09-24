@@ -1,0 +1,211 @@
+name: Build and Publish Add-On
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - main
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  information:
+    name: Gather Add-on information
+    runs-on: ubuntu-latest
+    outputs:
+      architectures: ${{ steps.information.outputs.architectures }}
+      build: ${{ steps.information.outputs.build }}
+      description: ${{ steps.information.outputs.description }}
+      name: ${{ steps.information.outputs.name }}
+      slug: ${{ steps.information.outputs.slug }}
+      target: ${{ steps.information.outputs.target }}
+      version: ${{ steps.information.outputs.version }}
+    steps:
+      - name: ⤵️ Check out code from GitHub
+        uses: actions/checkout@v4
+
+      - name: 🚀 Run add-on information action
+        id: information
+        uses: frenck/action-addon-information@v1.4.2
+
+  build:
+    name: Build ${{ matrix.arch }} add-on
+    runs-on: ubuntu-latest
+    needs: information
+    strategy:
+      matrix:
+        arch: ${{ fromJson(needs.information.outputs.architectures) }}
+    steps:
+      - name: ⤵️ Check out code from GitHub
+        uses: actions/checkout@v4
+
+      - name: 🏗 Set up build cache
+        id: cache
+        uses: actions/cache@v3.3.2
+        with:
+          path: /tmp/.docker-cache
+          key: docker-${{ matrix.arch }}-${{ github.sha }}
+          restore-keys: |
+            docker-${{ matrix.arch }}-
+
+      - name: 🏗 Set up QEMU
+        uses: docker/setup-qemu-action@v3.0.0
+
+      - name: 🏗 Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3.0.0
+
+      - name: 🏗 Set up CodeNotary vcn
+        uses: vchain-us/verify-chain-action@v1.0.0
+
+      - name: ℹ️ Compose build flags
+        id: flags
+        run: |
+          echo "date=$(date +"%Y-%m-%dT%H:%M:%SZ")" >> $GITHUB_OUTPUT
+          from=$(yq --no-colors eval ".build_from.${{ matrix.arch }}" "build.yaml")
+          echo "from=${from}" >> $GITHUB_OUTPUT
+
+          if [[ "${{ matrix.arch}}" = "amd64" ]]; then
+            echo "platform=linux/amd64" >> $GITHUB_OUTPUT
+          elif [[ "${{ matrix.arch }}" = "i386" ]]; then
+            echo "platform=linux/386" >> $GITHUB_OUTPUT
+          elif [[ "${{ matrix.arch }}" = "armhf" ]]; then
+            echo "platform=linux/arm/v6" >> $GITHUB_OUTPUT
+          elif [[ "${{ matrix.arch }}" = "armv7" ]]; then
+            echo "platform=linux/arm/v7" >> $GITHUB_OUTPUT
+          elif [[ "${{ matrix.arch }}" = "aarch64" ]]; then
+            echo "platform=linux/arm64/v8" >> $GITHUB_OUTPUT
+          else
+            echo "::error ::Could not determine platform for architecture ${{ matrix.arch }}"
+            exit 1
+          fi
+
+      - name: 🚀 Build add-on
+        uses: docker/build-push-action@v5.0.0
+        with:
+          push: false
+          context: .
+          file: ./Dockerfile
+          cache-from: |
+            type=local,src=/tmp/.docker-cache
+            ghcr.io/${{ github.repository }}/${{ needs.information.outputs.slug }}:cache-${{ matrix.arch }}
+          cache-to: type=local,mode=max,dest=/tmp/.docker-cache-new
+          platforms: ${{ steps.flags.outputs.platform }}
+          build-args: |
+            BUILD_FROM=${{ steps.flags.outputs.from }}
+            BUILD_ARCH=${{ matrix.arch }}
+            BUILD_DATE=${{ steps.flags.outputs.date }}
+            BUILD_DESCRIPTION=${{ needs.information.outputs.description }}
+            BUILD_NAME=${{ needs.information.outputs.name }}
+            BUILD_REF=${{ github.sha }}
+            BUILD_REPOSITORY=${{ github.repository }}
+            BUILD_VERSION=${{ needs.information.outputs.version }}
+          tags: |
+            ghcr.io/${{ github.repository }}/${{ needs.information.outputs.slug }}:${{ needs.information.outputs.version }}-${{ matrix.arch }}
+            ghcr.io/${{ github.repository }}/${{ needs.information.outputs.slug }}:latest-${{ matrix.arch }}
+          outputs: type=docker,dest=/tmp/image-${{ matrix.arch }}.tar
+
+      - name: ⬆️ Upload build artifact
+        uses: actions/upload-artifact@v3.1.3
+        with:
+          name: image-${{ matrix.arch }}
+          path: /tmp/image-${{ matrix.arch }}.tar
+          retention-days: 1
+
+      - name: 🚚 Swap build cache
+        run: |
+          rm -rf /tmp/.docker-cache
+          mv /tmp/.docker-cache-new /tmp/.docker-cache
+
+  publish:
+    name: Publish add-on
+    runs-on: ubuntu-latest
+    needs: [information, build]
+    if: github.event_name != 'pull_request'
+    steps:
+      - name: ⤵️ Check out code from GitHub
+        uses: actions/checkout@v4
+
+      - name: 🏗 Set up QEMU
+        uses: docker/setup-qemu-action@v3.0.0
+
+      - name: 🏗 Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3.0.0
+
+      - name: ℹ️ Compose build flags
+        id: flags
+        run: |
+          echo "date=$(date +"%Y-%m-%dT%H:%M:%SZ")" >> $GITHUB_OUTPUT
+
+      - name: 🏗 Login to GitHub Container Registry
+        uses: docker/login-action@v3.0.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: ⤵️ Download all build artifacts
+        uses: actions/download-artifact@v3.0.2
+
+      - name: 📦 Create multi-arch manifest
+        run: |
+          # Load all architecture images
+          for arch in ${{ needs.information.outputs.architectures }}; do
+            docker load --input image-${arch}/image-${arch}.tar
+          done
+
+          # Create and push manifest
+          docker buildx imagetools create \
+            --tag ghcr.io/${{ github.repository }}/${{ needs.information.outputs.slug }}:${{ needs.information.outputs.version }} \
+            --tag ghcr.io/${{ github.repository }}/${{ needs.information.outputs.slug }}:latest \
+            $(printf "ghcr.io/${{ github.repository }}/${{ needs.information.outputs.slug }}:${{ needs.information.outputs.version }}-%s " ${{ needs.information.outputs.architectures }})
+
+  test:
+    name: Test add-on
+    runs-on: ubuntu-latest
+    needs: [information, build]
+    strategy:
+      matrix:
+        arch: [amd64]
+    steps:
+      - name: ⤵️ Check out code from GitHub
+        uses: actions/checkout@v4
+
+      - name: ⤵️ Download build artifact
+        uses: actions/download-artifact@v3.0.2
+        with:
+          name: image-${{ matrix.arch }}
+
+      - name: 🔬 Load Docker image
+        run: docker load --input image-${{ matrix.arch }}.tar
+
+      - name: 🧪 Test add-on start
+        run: |
+          # Start the add-on with minimal configuration
+          docker run --rm -d \
+            --name test-addon \
+            -e MQTT_BROKER=test \
+            -e MQTT_PORT=1883 \
+            -e WEATHER_PROVIDER=openweathermap \
+            -e WEATHER_API_KEY=test \
+            -e LATITUDE=51.1657 \
+            -e LONGITUDE=10.4515 \
+            -e LOG_LEVEL=DEBUG \
+            ghcr.io/${{ github.repository }}/${{ needs.information.outputs.slug }}:${{ needs.information.outputs.version }}-${{ matrix.arch }}
+
+          # Wait for startup
+          sleep 10
+
+          # Check if container is running
+          docker ps | grep test-addon
+
+          # Check logs for errors
+          docker logs test-addon
+
+          # Stop container
+          docker stop test-addon

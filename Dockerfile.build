@@ -1,0 +1,47 @@
+# Build configuration for different architectures
+ARG BUILD_FROM=ghcr.io/home-assistant/amd64-base:3.18
+
+FROM $BUILD_FROM
+
+# Install runtime dependencies  
+RUN apk add --no-cache \
+    bash \
+    python3 \
+    py3-pip \
+    py3-setuptools \
+    py3-wheel \
+    tzdata \
+    && rm -rf /var/cache/apk/*
+
+# Copy requirements and install Python dependencies
+COPY requirements.txt /tmp/requirements.txt
+RUN pip3 install --no-cache-dir -r /tmp/requirements.txt \
+    && rm -f /tmp/requirements.txt
+
+# Install bashio for Home Assistant integration
+RUN pip3 install --no-cache-dir bashio
+
+# Copy application files
+COPY run.sh /
+COPY app/ /opt/app/
+
+# Set permissions
+RUN chmod a+x /run.sh
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python3 -c "import requests; requests.get('http://localhost:8080/health', timeout=5)" || exit 1
+
+# Labels for Home Assistant Add-on
+LABEL \
+    io.hass.name="Heisha Weather Prediction Control" \
+    io.hass.description="Intelligente Panasonic Wärmepumpen-Steuerung mit Wettervorhersage" \
+    io.hass.arch="armhf|aarch64|i386|amd64|armv7" \
+    io.hass.type="addon" \
+    io.hass.version="1.0.0"
+
+# Set working directory
+WORKDIR /opt/app
+
+# Start script
+CMD [ "/run.sh" ]

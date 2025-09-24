@@ -1,0 +1,87 @@
+name: Heisha Weather Prediction Control
+version: "1.0.0"
+slug: heisha-weather-control
+description: Intelligente Panasonic Wärmepumpen-Steuerung mit Wettervorhersage und lernendem Algorithmus
+url: https://github.com/roland/heisha-weather-control
+arch:
+  - armhf
+  - armv7
+  - aarch64
+  - amd64
+  - i386
+startup: application
+boot: auto
+init: false
+map:
+  - share:rw
+  - config:rw
+options:
+  # MQTT Einstellungen
+  mqtt:
+    broker: core-mosquitto
+    port: 1883
+    username: ""
+    password: ""
+    topic_prefix: "panasonic_heat_pump"
+  
+  # Wetter API Einstellungen
+  weather:
+    api_provider: "openweathermap"
+    api_key: ""
+    update_interval: 300
+  
+  # Haus-Konfiguration (Basic)
+  house:
+    latitude: 51.1657
+    longitude: 10.4515
+    timezone: "Europe/Berlin"
+    heating_system_type: "underfloor"
+    building_thermal_mass: "medium"
+    target_temperature: 21.0
+    night_setback: 2.0
+    
+  # Erweiterte Einstellungen (Expert)
+  advanced:
+    thermal_lag_hours: 4.0
+    solar_gain_factor: 0.3
+    wind_factor: 0.1
+    learning_rate: 0.05
+    prediction_horizon_hours: 24
+    min_runtime_minutes: 30
+    max_modulation: 100
+    
+  # Logging
+  logging:
+    level: "INFO"
+    
+schema:
+  mqtt:
+    broker: str
+    port: port
+    username: str?
+    password: password?
+    topic_prefix: str
+  weather:
+    api_provider: list(openweathermap|weatherapi|dwd)?
+    api_key: str
+    update_interval: int(60,3600)?
+  house:
+    latitude: float(-90,90)
+    longitude: float(-180,180)
+    timezone: str
+    heating_system_type: list(underfloor|radiator|mixed)?
+    building_thermal_mass: list(low|medium|high)?
+    target_temperature: float(15,30)
+    night_setback: float(0,10)?
+  advanced:
+    thermal_lag_hours: float(0.5,12)?
+    solar_gain_factor: float(0,1)?
+    wind_factor: float(0,1)?
+    learning_rate: float(0.001,0.5)?
+    prediction_horizon_hours: int(6,48)?
+    min_runtime_minutes: int(10,120)?
+    max_modulation: int(20,100)?
+  logging:
+    level: list(DEBUG|INFO|WARNING|ERROR)?
+
+image: ghcr.io/home-assistant/{arch}-addon-heisha-weather-control
