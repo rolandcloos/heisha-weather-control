@@ -1,12 +1,17 @@
-# Heisha Weather Prediction Control - Home Assistant Add-ons Repository
+# Heisha Weather Prediction Control
 
-Dieses Repository enthält Home Assistant Add-ons für die intelligente Steuerung von Panasonic Wärmepumpen mit HeishaMon.
+[![GitHub Release](https://img.shields.io/github/v/release/rolandcloos/heisha-weather-control?style=for-the-badge)](https://github.com/rolandcloos/heisha-weather-control/releases)
+[![GitHub Activity](https://img.shields.io/github/commit-activity/y/rolandcloos/heisha-weather-control?style=for-the-badge)](https://github.com/rolandcloos/heisha-weather-control/commits/main)
+
+Ein intelligentes Home Assistant Add-On zur Steuerung von Panasonic Wärmepumpen mit HeishaMon über MQTT, integrierter Wettervorhersage und lernendem Algorithmus für optimale Energieeffizienz.
 
 ## 📦 Verfügbare Add-ons
 
-### [Heisha Weather Prediction Control](heisha-weather-control/)
+Dieses Repository enthält folgende Home Assistant Add-ons:
 
-Ein intelligentes Home Assistant Add-On zur Steuerung von Panasonic Wärmepumpen mit HeishaMon über MQTT, integrierter Wettervorhersage und lernendem Algorithmus für optimale Energieeffizienz.
+### Heisha Weather Prediction Control
+
+Intelligente Panasonic Wärmepumpen-Steuerung mit Wettervorhersage und lernendem Algorithmus.
 
 ## 🌟 Features
 

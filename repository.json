@@ -1,14 +1,5 @@
 {
   "name": "Heisha Weather Prediction Control Add-ons",
   "url": "https://github.com/rolandcloos/heisha-weather-control",
-  "maintainer": "Roland Cloos",
-  "addons": {
-    "heisha-weather-control": {
-      "name": "Heisha Weather Prediction Control",
-      "description": "Intelligente Panasonic Wärmepumpen-Steuerung mit Wettervorhersage und lernendem Algorithmus",
-      "version": "1.0.0",
-      "slug": "heisha-weather-control",
-      "url": "https://github.com/rolandcloos/heisha-weather-control/tree/main/heisha-weather-control"
-    }
-  }
+  "maintainer": "Roland Cloos"
 }
